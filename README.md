@@ -1,4 +1,4 @@
-# rv32i
+# RV32I
 
 ## PC Simulation and Waveforms
 
