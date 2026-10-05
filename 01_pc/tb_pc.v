@@ -6,6 +6,12 @@ module tb_pc;
 
     pc dut (.clk(clk), .rst(rst), .pc_next(pc_next), .pc(pc));
 
+    // Record all testbench and DUT signals for waveform viewing.
+    initial begin
+        $dumpfile("pc.vcd");
+        $dumpvars(0, tb_pc);
+    end
+
     // 10 ns clock
     initial clk = 0;
     always #5 clk = ~clk;

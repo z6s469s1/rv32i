@@ -1,0 +1,6 @@
+# Compiled Verilog testbench executables
+*_tb
+
+# Generated simulation waveforms
+*.vcd
+*.fst
