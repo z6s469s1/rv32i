@@ -1,49 +1,60 @@
-`timescale 1ns/1ps
+//set the time unit and time precision
+`timescale 1ns / 1ps
+
 module tb_pc;
-    reg        clk, rst;
-    reg [31:0] pc_next;
-    wire[31:0] pc;
 
-    pc dut (.clk(clk), .rst(rst), .pc_next(pc_next), .pc(pc));
+    reg clk;
+    reg rst;
+    reg [31:0] next_pc;
+    wire [31:0] pc;
 
-    // Record all testbench and DUT signals for waveform viewing.
-    initial begin
-        $dumpfile("pc.vcd");
-        $dumpvars(0, tb_pc);
-    end
+    //instantiate the pc module
+    pc dut(
+        .clk(clk),
+        .rst(rst),
+        .next_pc(next_pc),
+        .pc(pc)
+    );
 
-    // 10 ns clock
-    initial clk = 0;
-    always #5 clk = ~clk;
-
-    integer errors = 0;
-    task check(input [31:0] exp);
-        if (pc !== exp) begin
-            $display("FAIL: pc=%0h expected=%0h", pc, exp);
-            errors = errors + 1;
-        end else
-            $display("ok:   pc=%0h", pc);
+    //define the check task
+    task check_pc(
+        input [31:0] pc,
+        input [31:0] expected_pc
+    );
+        if(pc !== expected_pc) begin
+            $display("Test failed: pc = %h, expected = %h", pc, expected_pc);
+            $finish;
+        end else begin
+            $display("Test passed: pc = %h", pc);
+        end
     endtask
 
+    //clock generation
+    always #5 clk = ~clk;
+
+    //testbench
     initial begin
-        // --- reset ---
-        rst=1; pc_next=32'h0; @(posedge clk); #1;
-        check(32'h0000_0000);    // after reset, PC=0
+        //save waveform
+        $dumpfile("tb_pc.vcd");
+        $dumpvars(0, tb_pc);
+        
+        //test case 1: reset
+        clk = 0;
+        rst = 1;
+        next_pc = 32'h0011_0000;
+        @(posedge clk);
+        #1;
+        check_pc(pc, 32'h0000_0000);
 
-        // --- advance PC+4 each cycle ---
-        rst=0;
-        pc_next=32'h0000_0004; @(posedge clk); #1; check(32'h0000_0004);
-        pc_next=32'h0000_0008; @(posedge clk); #1; check(32'h0000_0008);
-        pc_next=32'h0000_000C; @(posedge clk); #1; check(32'h0000_000C);
-
-        // --- branch jump to address ---
-        pc_next=32'h0000_0100; @(posedge clk); #1; check(32'h0000_0100);
-
-        // --- reset again ---
-        rst=1; pc_next=32'h0; @(posedge clk); #1; check(32'h0000_0000);
-
-        if (errors==0) $display("ALL TESTS PASSED");
-        else           $display("%0d TEST(S) FAILED", errors);
+        //test case 2: check pc whether it is updated correctly
+        for (integer i = 0; i < 32'hFFFF_FFFF; i+=32'h0001_0001) begin
+            rst = 0;
+            next_pc = i;
+            @(posedge clk);
+            #1;
+            check_pc(pc, i);
+        end
+        
         $finish;
     end
 endmodule

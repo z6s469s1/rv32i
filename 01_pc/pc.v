@@ -1,12 +1,20 @@
-// Program Counter — 32-bit register, synchronous reset
-module pc (
-    input  wire        clk,      // clock
-    input  wire        rst,      // synchronous reset (active high)
-    input  wire [31:0] pc_next,  // next PC value (PC+4 or branch target)
-    output reg  [31:0] pc        // current PC value → IMEM address
+module pc
+(
+    input wire clk,
+    input wire rst,
+    input wire [31:0] next_pc,
+    output reg [31:0] pc
 );
-    always @(posedge clk) begin
-        if (rst) pc <= 32'h0000_0000;
-        else     pc <= pc_next;
+
+    always @(posedge clk)begin
+        if(rst)
+            begin
+                pc <= 32'h0000_0000;
+            end
+        else
+            begin
+                pc <= next_pc;  
+            end
     end
+
 endmodule
