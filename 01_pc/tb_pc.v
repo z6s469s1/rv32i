@@ -17,13 +17,14 @@ module tb_pc;
     );
 
     //define the check task
+    integer error_count = 0;
     task check_pc(
         input [31:0] pc,
         input [31:0] expected_pc
     );
         if(pc !== expected_pc) begin
             $display("Test failed: pc = %h, expected = %h", pc, expected_pc);
-            $finish;
+            error_count = error_count + 1;
         end else begin
             $display("Test passed: pc = %h", pc);
         end
@@ -55,6 +56,11 @@ module tb_pc;
             check_pc(pc, i);
         end
         
+        if (error_count == 0) begin
+            $display("All tests passed!");
+        end else begin
+            $display("%d tests failed.", error_count);
+        end
         $finish;
     end
 endmodule
