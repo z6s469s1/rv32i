@@ -1,19 +1,21 @@
+English | [繁體中文](README.zh-TW.md)
+
 # IMEM
 
-指令記憶體（Instruction Memory）用來儲存程式指令。PC 透過 `addr` 提供以 byte 為單位的位址，IMEM 再透過 `instr` 輸出對應的指令。
+Instruction memory stores program instructions. The PC supplies a byte address through `addr`, and IMEM returns the matching instruction through `instr`.
 
-這個模組沒有 clock，也沒有寫入介面。它採用組合邏輯讀取：位址改變後，輸出就會跟著更新，不需要等待 clock 邊緣。
+This module has no clock or write port. It uses a combinational read: when the address changes, the output updates without waiting for a clock edge.
 
-- 電路圖
+- Circuit diagram
 
-![imem](imemv2.png)
+![IMEM](imemv2.png)
 
 - Port Table
 
-| 訊號 | 方向與寬度 | 功能 |
+| Signal | Direction and width | Purpose |
 | --- | --- | --- |
-| `addr` | 32-bit 輸入 | 來自 PC 的 byte 位址 |
-| `instr` | 32-bit 輸出 | 位址對應的指令編碼 |
+| `addr` | 32-bit input | Byte address from PC |
+| `instr` | 32-bit output | Instruction word at the address |
 
 ```verilog
 module imem #(parameter DEPTH = 256) (
@@ -24,52 +26,52 @@ module imem #(parameter DEPTH = 256) (
 
 # Code
 
-- 宣告指令記憶體
+- Declare instruction memory
 
     ```verilog
     reg [31:0] mem [0:DEPTH-1];
     ```
 
-    `DEPTH` 決定記憶體可以儲存幾筆指令，預設為 256。`mem` 每筆資料是 32 bits，也就是 4 bytes。
+    `DEPTH` sets the number of instruction entries. Its default is 256. Each entry holds 32 bits, or 4 bytes.
 
     ```text
-    256 筆 × 4 bytes = 1024 bytes = 1 KiB（常稱 1 KB）
+    256 entries × 4 bytes = 1024 bytes = 1 KiB (often called 1 KB)
     ```
 
-- 載入程式
+- Load the program
 
     ```verilog
     initial $readmemh("program.hex", mem);
     ```
 
-    模擬開始時，`$readmemh` 會讀取 `program.hex` 裡的十六進位資料，依序存入 `mem`。這裡使用相對路徑，因此會從執行模擬器時的工作目錄尋找檔案。
+    At the start of simulation, `$readmemh` loads hexadecimal values from `program.hex` into `mem` in order. The relative path is resolved from the simulator's working directory.
 
-- 讀取指令
+- Read an instruction
 
     ```verilog
     assign instr = mem[addr[31:2]];
     ```
 
-    `addr[31:2]` 將 byte 位址轉成陣列索引。`assign` 是連續指定，會持續將選到的記憶體內容送到 `instr`。
+    `addr[31:2]` converts a byte address into an array index. The continuous assignment drives `instr` with the selected memory entry.
 
-- 讀取範例
+- Read examples
 
-    目前的 `program.hex` 包含以下四筆指令：
+    The current `program.hex` contains these four instructions:
 
-    | Byte 位址 `addr` | 陣列位置 | 指令輸出 `instr` | 指令內容 |
+    | Byte address `addr` | Array entry | Instruction output `instr` | Instruction |
     | --- | --- | --- | --- |
     | `0x000` | `mem[0]` | `00500093` | `addi x1, x0, 5` |
     | `0x004` | `mem[1]` | `00A00113` | `addi x2, x0, 10` |
     | `0x008` | `mem[2]` | `002081B3` | `add x3, x1, x2` |
-    | `0x00C` | `mem[3]` | `00000013` | `nop`（`addi x0, x0, 0`） |
+    | `0x00C` | `mem[3]` | `00000013` | `nop` (`addi x0, x0, 0`) |
 
-# 問題與討論
+# Questions and Discussion
 
-- 為什麼位址除以 4 就能當作陣列索引？
+- Why does dividing the address by 4 give the array index?
 
-    PC 的位址以 byte 為單位，但 `mem` 每筆資料占 4 bytes。因此，將 byte 位址除以 4，就能找到對應的陣列位置。
+    PC addresses count bytes, but each `mem` entry holds 4 bytes. Dividing the byte address by 4 selects the matching entry.
 
-    `addr[31:2]` 會捨去最低兩個 bit。對這個無號位址來說，等同於整數除以 4：
+    `addr[31:2]` drops the lowest two bits. For this unsigned address, that is the same as integer division by 4:
 
     ```text
     addr = 0x000 → index = 0 → mem[0]
@@ -78,12 +80,12 @@ module imem #(parameter DEPTH = 256) (
     addr = 0x00C → index = 3 → mem[3]
     ```
 
-- 位址沒有對齊會怎樣？
+- What happens with an unaligned address?
 
-    目前的程式假設每筆指令的位址都對齊 4 bytes，也就是 `addr[1:0]` 應為 `2'b00`。程式本身沒有檢查對齊：位址 0、1、2、3 都會讀取 `mem[0]`，因為最低兩位被忽略了。
+    The code assumes 4-byte-aligned instruction addresses, so `addr[1:0]` should be `2'b00`. It does not check alignment. Addresses 0, 1, 2, and 3 all select `mem[0]` because the lowest two bits are ignored.
 
-- `addr` 有 32 bits，是否可以存取超過 1 KB 的資料？
+- Does a 32-bit address allow access to more than 1 KB?
 
-    位址能表示的範圍，不等於實際記憶體容量。預設陣列只有 256 筆，有效索引為 0～255，對應的 byte 位址範圍是 `0x000`～`0x3FF`；最後一筆對齊指令的起始位址是 `0x3FC`。
+    The address width does not determine the actual memory capacity. The default array has only 256 entries, with valid indices from 0 to 255. The byte address range is `0x000` through `0x3FF`, and the last aligned instruction starts at `0x3FC`.
 
-    程式沒有檢查位址範圍。例如 `addr = 0x400` 會選到索引 256，超出有效範圍，在 RTL 模擬中會讀到 `x`（未知值）。
+    The code does not check address bounds. For example, `addr = 0x400` selects index 256, which is out of range and returns `x` (unknown) in RTL simulation.
