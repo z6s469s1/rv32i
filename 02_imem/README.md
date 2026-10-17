@@ -6,7 +6,7 @@
 
 - 電路圖
 
-![imem](imem.png)
+![imem](imemv2.png)
 
 - Port Table
 
