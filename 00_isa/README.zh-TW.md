@@ -140,38 +140,6 @@ ISA（Instruction Set Architecture，指令集架構）定義軟體可使用的�
 - 目標為 `pc + offset`，`rd` 寫入 `pc + 4`。純 RV32I 的跳躍目標仍須 4-byte 對齊。
 - 組合語言中的 `j label` 是 `jal x0, label` 的虛擬指令；常見的 `ret` 則是 I-type 的 `jalr x0, 0(x1)`。
 
-## 3. 立即數重組與 Verilog 解碼
-
-B/J-type 的立即數並非按順序連續存放；解碼時要先重組、補上最低位的 0，再符號延伸。以下 `instr` 為 32-bit 指令，所有 `imm_*` 都是重組後的 32-bit 位元值。
-
-```verilog
-wire [6:0] opcode = instr[6:0];
-wire [4:0] rd     = instr[11:7];
-wire [2:0] funct3 = instr[14:12];
-wire [4:0] rs1    = instr[19:15];
-wire [4:0] rs2    = instr[24:20];
-wire [6:0] funct7 = instr[31:25];
-
-wire [31:0] imm_i = {{20{instr[31]}}, instr[31:20]};
-wire [31:0] imm_s = {{20{instr[31]}}, instr[31:25], instr[11:7]};
-wire [31:0] imm_b = {{19{instr[31]}}, instr[31], instr[7],
-                     instr[30:25], instr[11:8], 1'b0};
-wire [31:0] imm_u = {instr[31:12], 12'b0};
-wire [31:0] imm_j = {{11{instr[31]}}, instr[31], instr[19:12],
-                     instr[20], instr[30:21], 1'b0};
-```
-
-這些 wire 只是擷取位元；控制單元仍需依 `opcode`、`funct3` 和必要的 `funct7` 判斷指令、檢查合法編碼，並選用對應欄位。例如 store 的 `instr[11:7]` 是立即數，不是目的暫存器。
-
-| Type | 來源暫存器 | 寫回暫存器 | 立即數的主要用途 |
-| --- | --- | --- | --- |
-| R | `rs1`、`rs2` | `rd` | 無 |
-| I | 通常為 `rs1` | 通常為 `rd` | 運算元、load offset、JALR offset；特殊指令另有定義 |
-| S | `rs1`、`rs2` | 無 | Store offset |
-| B | `rs1`、`rs2` | 無 | 條件分支的 pc-relative offset |
-| U | 無 | `rd` | 高 20 bits 常數或 pc-relative 位址 |
-| J | 無 | `rd` | 直接跳躍的 pc-relative offset |
-
 ## 參考資料
 
 - [RISC-V 官方規格：RV32I Base Integer Instruction Set](https://docs.riscv.org/reference/isa/unpriv/rv32)

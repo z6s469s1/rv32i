@@ -140,38 +140,6 @@ Examples: jal x1, func        # x1 = pc + 4; jump to func
 - The target is `pc + offset`, and `rd` receives `pc + 4`. RV32I alone still requires 4-byte target alignment.
 - The assembly pseudoinstruction `j label` expands to `jal x0, label`. The common `ret` pseudoinstruction expands to the I-type instruction `jalr x0, 0(x1)`.
 
-## 3. Immediate Reconstruction and Verilog Decoding
-
-B/J-type immediate bits are not stored in consecutive numerical order. Decoding reconstructs the offset, inserts the fixed low zero bit, and sign-extends the result. Below, `instr` is a 32-bit instruction, and every `imm_*` signal is the reconstructed 32-bit bit pattern.
-
-```verilog
-wire [6:0] opcode = instr[6:0];
-wire [4:0] rd     = instr[11:7];
-wire [2:0] funct3 = instr[14:12];
-wire [4:0] rs1    = instr[19:15];
-wire [4:0] rs2    = instr[24:20];
-wire [6:0] funct7 = instr[31:25];
-
-wire [31:0] imm_i = {{20{instr[31]}}, instr[31:20]};
-wire [31:0] imm_s = {{20{instr[31]}}, instr[31:25], instr[11:7]};
-wire [31:0] imm_b = {{19{instr[31]}}, instr[31], instr[7],
-                     instr[30:25], instr[11:8], 1'b0};
-wire [31:0] imm_u = {instr[31:12], 12'b0};
-wire [31:0] imm_j = {{11{instr[31]}}, instr[31], instr[19:12],
-                     instr[20], instr[30:21], 1'b0};
-```
-
-These wires only extract bits. The control unit must still decode `opcode`, `funct3`, and, where needed, `funct7`, validate the encoding, and select the appropriate fields. For example, `instr[11:7]` in a store instruction holds immediate bits rather than a destination register.
-
-| Type | Source registers | Destination register | Main immediate purpose |
-| --- | --- | --- | --- |
-| R | `rs1`, `rs2` | `rd` | None |
-| I | Usually `rs1` | Usually `rd` | Operand, load offset, or JALR offset; special instructions have separate definitions |
-| S | `rs1`, `rs2` | None | Store offset |
-| B | `rs1`, `rs2` | None | pc-relative conditional branch offset |
-| U | None | `rd` | Upper 20-bit constant or pc-relative address |
-| J | None | `rd` | pc-relative direct jump offset |
-
 ## References
 
 - [RISC-V Official Specification: RV32I Base Integer Instruction Set](https://docs.riscv.org/reference/isa/unpriv/rv32)
