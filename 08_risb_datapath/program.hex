@@ -1,0 +1,61 @@
+//R & I
+00500093  // addi x1, x0,  5    x1=5
+00A00113  // addi x2, x0, 10    x2=10
+002081B3  // add  x3, x1, x2    x3=15
+40208233  // sub  x4, x1, x2    x4=-5 (0xFFFFFFFB)
+0020F2B3  // and  x5, x1, x2    x5=0
+0020E333  // or   x6, x1, x2    x6=15
+00000013 // nop
+00000013 // nop
+//S
+02a00093 // addi x1,x0,42
+00102023 // sw   x1,0(x0)
+00002103 // lw   x2,0(x0)
+00000013 // nop
+//B
+// All six conditions, equality, signed overflow and backward loop
+fff00513 // 0x030: addi x10,x0,-1
+00100593 // 0x034: addi x11,x0,1
+01f59613 // 0x038: slli x12,x11,31 // signed minimum
+fff60693 // 0x03c: addi x13,x12,-1 // signed maximum
+00b58463 // 0x040: beq x11,x11,+8 // expected taken=1
+001f8f93 // 0x044: FAIL marker: addi x31,x31,1 (must skip)
+00b50463 // 0x048: beq x10,x11,+8 // expected taken=0
+00000013 // 0x04c: nop (fall-through)
+00b51463 // 0x050: bne x10,x11,+8 // expected taken=1
+001f8f93 // 0x054: FAIL marker: addi x31,x31,1 (must skip)
+00b59463 // 0x058: bne x11,x11,+8 // expected taken=0
+00000013 // 0x05c: nop (fall-through)
+00b54463 // 0x060: blt x10,x11,+8 // expected taken=1
+001f8f93 // 0x064: FAIL marker: addi x31,x31,1 (must skip)
+00a5c463 // 0x068: blt x11,x10,+8 // expected taken=0
+00000013 // 0x06c: nop (fall-through)
+00a5d463 // 0x070: bge x11,x10,+8 // expected taken=1
+001f8f93 // 0x074: FAIL marker: addi x31,x31,1 (must skip)
+00b55463 // 0x078: bge x10,x11,+8 // expected taken=0
+00000013 // 0x07c: nop (fall-through)
+00a5e463 // 0x080: bltu x11,x10,+8 // expected taken=1
+001f8f93 // 0x084: FAIL marker: addi x31,x31,1 (must skip)
+00b56463 // 0x088: bltu x10,x11,+8 // expected taken=0
+00000013 // 0x08c: nop (fall-through)
+00b57463 // 0x090: bgeu x10,x11,+8 // expected taken=1
+001f8f93 // 0x094: FAIL marker: addi x31,x31,1 (must skip)
+00a5f463 // 0x098: bgeu x11,x10,+8 // expected taken=0
+00000013 // 0x09c: nop (fall-through)
+00b5c463 // 0x0a0: blt x11,x11,+8 // expected taken=0
+00000013 // 0x0a4: nop (fall-through)
+00b5d463 // 0x0a8: bge x11,x11,+8 // expected taken=1
+001f8f93 // 0x0ac: FAIL marker: addi x31,x31,1 (must skip)
+00b5e463 // 0x0b0: bltu x11,x11,+8 // expected taken=0
+00000013 // 0x0b4: nop (fall-through)
+00b5f463 // 0x0b8: bgeu x11,x11,+8 // expected taken=1
+001f8f93 // 0x0bc: FAIL marker: addi x31,x31,1 (must skip)
+00b64463 // 0x0c0: blt x12,x11,+8 // expected taken=1
+001f8f93 // 0x0c4: FAIL marker: addi x31,x31,1 (must skip)
+00a6d463 // 0x0c8: bge x13,x10,+8 // expected taken=1
+001f8f93 // 0x0cc: FAIL marker: addi x31,x31,1 (must skip)
+00300713 // 0x0d0: addi x14,x0,3 // backward loop counter
+fff70713 // 0x0d4: loop: addi x14,x14,-1
+fe071ee3 // 0x0d8: bne x14,x0,-4 // taken twice, then fall-through
+00100f13 // 0x0dc: addi x30,x0,1 // completion marker
+00000063 // 0x0e0: done: beq x0,x0,0
