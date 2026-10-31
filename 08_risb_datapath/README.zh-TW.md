@@ -10,6 +10,35 @@
 
 ![R/I/S/B Datapath](risb_datapath.png)
 
+## B-type 分支指令介紹
+
+B-type 指令依兩個暫存器的比較結果決定是否跳轉，語法為 `branch rs1, rs2, offset`。條件成立時，下一個 PC 為目前指令的 `PC + offset`；否則為 `PC + 4`。它們常用於 if/else、迴圈條件與邊界檢查，不會保存返回位址，也不寫入 rd。
+
+| 指令 | 語法 | 比較方式 | 常見用途 |
+| --- | --- | --- | --- |
+| BEQ | `beq rs1, rs2, offset` | 相等時跳轉 | 判斷相同數值、檢查是否為零 |
+| BNE | `bne rs1, rs2, offset` | 不相等時跳轉 | 迴圈尚未結束時跳回 |
+| BLT | `blt rs1, rs2, offset` | signed 小於時跳轉 | 有號數下界或迴圈檢查 |
+| BGE | `bge rs1, rs2, offset` | signed 大於或等於時跳轉 | 有號數達到上界時離開迴圈 |
+| BLTU | `bltu rs1, rs2, offset` | unsigned 小於時跳轉 | 無號計數器與範圍比較 |
+| BGEU | `bgeu rs1, rs2, offset` | unsigned 大於或等於時跳轉 | 無號數上界檢查 |
+
+例如 `rs1 = 0xFFFFFFFF`、`rs2 = 1`，BLT 將前者視為 -1，因此條件成立；BLTU 將它視為 4294967295，因此條件不成立。BEQ 與 BNE 只比較位元是否相同，不受 signed／unsigned 解讀影響。
+
+### ALU 與 PC 如何配合
+
+分支時 `alu_src = 0`，讓中間 ALU 取得 `rs1` 與 `rs2`，`alu_op = SUB` 產生供 BEQ/BNE 使用的 `zero`。ALU 同時直接比較兩個運算元，提供 `alu_lt` 與 `alu_ltu` 給 Branch Unit。Branch Unit 依 `funct3` 選擇條件，目標位址則由另一條 `PC + B-immediate` 路徑計算。
+
+```text
+rs1、rs2 ── ALU 比較旗標 ── Branch Unit ── branch_taken
+PC、B-immediate ── 目標加法器 ── branch_target
+is_branch、branch_taken ── PC MUX ── next_pc
+```
+
+`reg_write = 0`、`mem_write = 0`，因此 ALU 的減法結果不會存入暫存器或記憶體。B-type 格式沒有 rd；雖然 parser 仍取出 `instr[11:7]`，這些位元屬於立即數，不是目的暫存器。
+
+例如 `beq x11,x11,+8` 一定成立，會跳過緊接的一條 4-byte 指令；`bne x14,x0,-4` 在 x14 非零時向後跳 4 bytes，可配合前一條遞減指令形成迴圈。組合邏輯先決定 next_pc，上升緣才更新 PC；branch 沒有 delay slot，被跳過的指令不應執行。
+
 ## 新增邏輯與資料流
 
 | 新增部分 | 所在位置 | 功能 |

@@ -8,17 +8,6 @@
 
 ![R/I/S/B/J Datapath](risbj_datapath.png)
 
-## 新增邏輯與資料流
-
-| 新增部分 | 所在位置 | 功能 |
-| --- | --- | --- |
-| Jump 控制 | `control.v` 的 `JAL`、`JALR` 分支 | 產生 `is_jal`、`is_jalr`，選擇立即數格式並開啟暫存器寫回 |
-| J-type 立即數路徑 | `immgen.v`，`imm_sel = 100` | 重組並符號延伸 JAL 位移 |
-| PC 選擇擴充 | `core_risbj.v` 的 PC 區段 | 加入 `pc + imm` 與 `(rdata1 + imm) & ~1` |
-| Link 寫回 | `core_risbj.v` 的 Write-back 區段 | Jump 指令選擇 `pc + 4` 作為寫回資料 |
-
-Jump 不需要 Branch Unit 的比較條件。JAL 以目前 PC 加上立即數計算目標，JALR 以 `rs1` 加上立即數計算目標，再清除 bit 0。目標與 link 都在組合邏輯中計算；下一個上升緣同時更新 PC 與目的暫存器。
-
 ## JAL 與 JALR 指令介紹
 
 JAL（Jump And Link）是 PC-relative 的無條件跳轉，語法為 `jal rd, offset`。它將下一條指令的位址保存在 `rd`，同時跳到目前 PC 加上位移的位置，常用於函式呼叫或直接跳轉。
@@ -31,6 +20,17 @@ JALR（Jump And Link Register）是以暫存器為基底的無條件跳轉，語
 | `jalr rd, imm(rs1)` | `(舊 rs1 + imm) & 0xFFFFFFFE` | `舊 PC + 4` | 間接呼叫、返回 |
 
 依常見呼叫慣例，`x1`（`ra`）用來保存返回位址。例如 `jal x1, offset` 呼叫目標函式，再由 `jalr x0, 0(x1)` 返回；後者也是 `ret` 虛擬指令的實際指令。`rd = x0` 時不保存 link，但仍會跳轉。兩種指令都不依賴 ALU 的 `zero` 或大小比較旗標。
+
+## 新增邏輯與資料流
+
+| 新增部分 | 所在位置 | 功能 |
+| --- | --- | --- |
+| Jump 控制 | `control.v` 的 `JAL`、`JALR` 分支 | 產生 `is_jal`、`is_jalr`，選擇立即數格式並開啟暫存器寫回 |
+| J-type 立即數路徑 | `immgen.v`，`imm_sel = 100` | 重組並符號延伸 JAL 位移 |
+| PC 選擇擴充 | `core_risbj.v` 的 PC 區段 | 加入 `pc + imm` 與 `(rdata1 + imm) & ~1` |
+| Link 寫回 | `core_risbj.v` 的 Write-back 區段 | Jump 指令選擇 `pc + 4` 作為寫回資料 |
+
+Jump 不需要 Branch Unit 的比較條件。JAL 以目前 PC 加上立即數計算目標，JALR 以 `rs1` 加上立即數計算目標，再清除 bit 0。目標與 link 都在組合邏輯中計算；下一個上升緣同時更新 PC 與目的暫存器。
 
 ## Control Unit 新增部分
 

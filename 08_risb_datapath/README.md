@@ -8,6 +8,35 @@ This chapter extends the [R/I/S datapath](../07_ris_datapath/README.md) with B-t
 
 ![R/I/S/B Datapath](risb_datapath.png)
 
+## B-type Branch Instructions
+
+B-type instructions compare two registers to decide whether to jump, using syntax `branch rs1, rs2, offset`. If the condition holds, the next PC is the current instruction's `PC + offset`; otherwise it is `PC + 4`. They support if/else decisions, loop conditions, and bounds checks. They neither save a return address nor write rd.
+
+| Instruction | Syntax | Comparison | Common use |
+| --- | --- | --- | --- |
+| BEQ | `beq rs1, rs2, offset` | Branch if equal | Match values or test for zero |
+| BNE | `bne rs1, rs2, offset` | Branch if not equal | Repeat a loop until its condition ends |
+| BLT | `blt rs1, rs2, offset` | Branch if signed less-than | Signed lower-bound or loop checks |
+| BGE | `bge rs1, rs2, offset` | Branch if signed greater-than-or-equal | Exit a loop at a signed upper bound |
+| BLTU | `bltu rs1, rs2, offset` | Branch if unsigned less-than | Unsigned counter and range comparisons |
+| BGEU | `bgeu rs1, rs2, offset` | Branch if unsigned greater-than-or-equal | Unsigned upper-bound checks |
+
+With `rs1 = 0xFFFFFFFF` and `rs2 = 1`, BLT interprets the first value as -1 and takes the branch. BLTU interprets it as 4294967295 and does not. BEQ and BNE only compare bit patterns, so signed/unsigned interpretation makes no difference.
+
+### How the ALU and PC Work Together
+
+For branches, `alu_src = 0` supplies `rs1` and `rs2` to the central ALU, and `alu_op = SUB` produces `zero` for BEQ/BNE. The ALU also directly compares the operands to provide `alu_lt` and `alu_ltu` to the Branch Unit. The Branch Unit selects the condition using `funct3`, while a separate `PC + B-immediate` path computes the target.
+
+```text
+rs1, rs2 ── ALU comparison flags ── Branch Unit ── branch_taken
+PC, B-immediate ── target adder ── branch_target
+is_branch, branch_taken ── PC MUX ── next_pc
+```
+
+With `reg_write = 0` and `mem_write = 0`, the subtraction result is written to neither registers nor memory. B-type has no rd field: although the parser still extracts `instr[11:7]`, those bits belong to the immediate, not a destination register.
+
+For example, `beq x11,x11,+8` always takes the branch and skips the next 4-byte instruction. `bne x14,x0,-4` jumps backward 4 bytes when x14 is nonzero, forming a loop with a preceding decrement instruction. Combinational logic selects next_pc before the rising edge updates PC. Branches have no delay slot; skipped instructions must not execute.
+
 ## New Logic and Data Flow
 
 | New component | Location | Purpose |

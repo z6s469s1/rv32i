@@ -10,6 +10,35 @@ The R/I/S name follows the directory naming: stores use S-type, while loads are 
 
 ![R/I/S Datapath](ris_datapath.png)
 
+## Load and Store Instructions
+
+Loads read memory into a register with syntax `load rd, offset(rs1)`. Stores write register data to memory with syntax `store rs2, offset(rs1)`. Both calculate a byte address as `rs1 + offset`, where offset is a signed 12-bit immediate ranging from -2048 to 2047. Loads use I-type; stores use S-type. The S in this chapter's name refers to the added store path, not the load instruction format.
+
+| Instruction | Syntax | Operation | Common use |
+| --- | --- | --- | --- |
+| LB | `lb rd, offset(rs1)` | Read 8 bits and sign-extend to 32 bits | Read a signed byte |
+| LBU | `lbu rd, offset(rs1)` | Read 8 bits and zero-extend to 32 bits | Read an unsigned byte |
+| LH | `lh rd, offset(rs1)` | Read 16 bits and sign-extend to 32 bits | Read a signed halfword |
+| LHU | `lhu rd, offset(rs1)` | Read 16 bits and zero-extend to 32 bits | Read an unsigned halfword |
+| LW | `lw rd, offset(rs1)` | Read all 32 bits | Read a word |
+| SB | `sb rs2, offset(rs1)` | Write `rs2[7:0]` | Update a byte |
+| SH | `sh rs2, offset(rs1)` | Write `rs2[15:0]` | Update a halfword |
+| SW | `sw rs2, offset(rs1)` | Write all of `rs2` | Update a word |
+
+For a memory byte containing `0xFF`, LB returns `0xFFFFFFFF` (-1), while LBU returns `0x000000FF` (255). Stores have no signed/unsigned variants because they directly store the selected low bits without extension.
+
+### How the ALU, Memory, and rd Work Together
+
+For loads and stores, the ALU performs ADD to calculate the effective address. Its result is an address, rather than the data a load writes back. DMEM reads the load data with width and extension selected by `funct3`; the Write-back MUX sends `mem_rdata` to the Register File's `wdata` for writing to `rd` at the rising edge. Stores send `rdata2` directly to DMEM's `wdata` and write memory at the rising edge. They set `reg_write = 0` and do not write rd.
+
+```text
+rs1 + offset ── ALU ADD ── DMEM addr
+Load:  DMEM rdata ── Write-back MUX ── Register File[rd]
+Store: Register File[rs2] ── DMEM wdata
+```
+
+For example, `sw x1,0(x0)` stores x1 starting at byte address 0, and `lw x2,0(x0)` reads it back into x2. If x1 is 42, x2 should also be 42. A word access uses addresses 0–3; the offset remains measured in bytes and is not automatically multiplied by 4. Both instructions advance PC by 4. A load with `rd = x0` still performs the read, but the Register File discards the result.
+
 ## New Logic and Data Flow
 
 | New component | Location | Purpose |

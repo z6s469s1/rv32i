@@ -10,6 +10,35 @@
 
 ![R/I/S Datapath](ris_datapath.png)
 
+## Load 與 Store 指令介紹
+
+Load 將資料從記憶體讀入暫存器，語法為 `load rd, offset(rs1)`；Store 將暫存器資料寫入記憶體，語法為 `store rs2, offset(rs1)`。兩者都使用 `rs1 + offset` 計算 byte 位址，offset 是 -2048～2047 的 signed 12-bit 立即數。Load 使用 I-type 格式，Store 使用 S-type 格式，因此本章名稱中的 S 指新增的 store 路徑，並不代表 load 也屬於 S-type。
+
+| 指令 | 語法 | 操作 | 常見用途 |
+| --- | --- | --- | --- |
+| LB | `lb rd, offset(rs1)` | 讀取 8 bits，符號延伸至 32 bits | 讀取 signed byte |
+| LBU | `lbu rd, offset(rs1)` | 讀取 8 bits，補 0 至 32 bits | 讀取 unsigned byte |
+| LH | `lh rd, offset(rs1)` | 讀取 16 bits，符號延伸至 32 bits | 讀取 signed halfword |
+| LHU | `lhu rd, offset(rs1)` | 讀取 16 bits，補 0 至 32 bits | 讀取 unsigned halfword |
+| LW | `lw rd, offset(rs1)` | 讀取完整 32 bits | 讀取 word |
+| SB | `sb rs2, offset(rs1)` | 寫入 `rs2[7:0]` | 更新 byte |
+| SH | `sh rs2, offset(rs1)` | 寫入 `rs2[15:0]` | 更新 halfword |
+| SW | `sw rs2, offset(rs1)` | 寫入完整 `rs2` | 更新 word |
+
+例如記憶體的一個 byte 為 `0xFF`，LB 讀到 `0xFFFFFFFF`（-1），LBU 則讀到 `0x000000FF`（255）。Store 沒有 signed／unsigned 版本，因為它直接儲存指定寬度的低位元，不做延伸。
+
+### ALU、記憶體與 rd 如何配合
+
+ALU 在 load/store 時執行 ADD，計算有效位址；它的結果是位址，不是 load 要寫回的資料。Load 由 DMEM 讀取資料，依 `funct3` 決定寬度與延伸，Write-back MUX 再將 `mem_rdata` 送到 Register File 的 `wdata`，在上升緣寫入 `rd`。Store 則將 `rdata2` 直接送到 DMEM 的 `wdata`，在上升緣寫入記憶體，`reg_write = 0`，不寫入 rd。
+
+```text
+rs1 + offset ── ALU ADD ── DMEM addr
+Load:  DMEM rdata ── Write-back MUX ── Register File[rd]
+Store: Register File[rs2] ── DMEM wdata
+```
+
+例如 `sw x1,0(x0)` 將 x1 存到 byte 位址 0 開始的位置，再以 `lw x2,0(x0)` 讀回 x2。若 x1 為 42，x2 預期也是 42。存取寬度為 word 時會使用位址 0～3，位移的單位仍是 byte，不會自動乘以 4。兩種指令執行後 PC 都加 4；Load 即使 `rd = x0` 仍會進行讀取，但 Register File 不保存結果。
+
 ## 新增邏輯與資料流
 
 | 新增部分 | 所在位置 | 功能 |

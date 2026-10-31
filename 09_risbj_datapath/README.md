@@ -8,17 +8,6 @@ This chapter extends the [R/I/S/B datapath](../08_risb_datapath/README.md) with 
 
 ![R/I/S/B/J Datapath](risbj_datapath.png)
 
-## New Logic and Data Flow
-
-| New component | Location | Purpose |
-| --- | --- | --- |
-| Jump controls | `JAL` and `JALR` cases in `control.v` | Generate `is_jal` and `is_jalr`, select the immediate format, and enable register write-back |
-| J-type immediate path | `immgen.v`, `imm_sel = 100` | Reassemble and sign-extend the JAL offset |
-| PC selection extensions | PC section in `core_risbj.v` | Add `pc + imm` and `(rdata1 + imm) & ~1` |
-| Link write-back | Write-back section in `core_risbj.v` | Select `pc + 4` for jump instructions |
-
-Jumps do not require the Branch Unit's comparison condition. JAL adds the immediate to the current PC. JALR adds the immediate to `rs1`, then clears bit 0. The target and link are computed combinationally; PC and the destination register update together at the next rising edge.
-
 ## JAL and JALR Instructions
 
 JAL (Jump And Link) is an unconditional PC-relative jump with syntax `jal rd, offset`. It saves the address of the next instruction in `rd` and jumps to the current PC plus the offset, making it useful for function calls and direct jumps.
@@ -31,6 +20,17 @@ JALR (Jump And Link Register) is an unconditional register-based jump with synta
 | `jalr rd, imm(rs1)` | `(old rs1 + imm) & 0xFFFFFFFE` | `old PC + 4` | Indirect calls, returns |
 
 Under common calling conventions, `x1` (`ra`) holds the return address. For example, `jal x1, offset` calls a function, which can return with `jalr x0, 0(x1)`; the latter is also the real instruction behind the `ret` pseudoinstruction. With `rd = x0`, the jump still occurs but the link is discarded. Neither instruction depends on the ALU's `zero` or ordering flags.
+
+## New Logic and Data Flow
+
+| New component | Location | Purpose |
+| --- | --- | --- |
+| Jump controls | `JAL` and `JALR` cases in `control.v` | Generate `is_jal` and `is_jalr`, select the immediate format, and enable register write-back |
+| J-type immediate path | `immgen.v`, `imm_sel = 100` | Reassemble and sign-extend the JAL offset |
+| PC selection extensions | PC section in `core_risbj.v` | Add `pc + imm` and `(rdata1 + imm) & ~1` |
+| Link write-back | Write-back section in `core_risbj.v` | Select `pc + 4` for jump instructions |
+
+Jumps do not require the Branch Unit's comparison condition. JAL adds the immediate to the current PC. JALR adds the immediate to `rs1`, then clears bit 0. The target and link are computed combinationally; PC and the destination register update together at the next rising edge.
 
 ## Control Unit Extensions
 

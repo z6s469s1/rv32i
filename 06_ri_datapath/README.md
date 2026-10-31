@@ -10,6 +10,42 @@ The PC adder generates the next sequential address, and the parser splits the in
 
 ![R/I Datapath](ri_datapath.png)
 
+## R-type and I-type ALU Instructions
+
+R-type instructions take two register operands, generally using syntax `op rd, rs1, rs2`. I-type ALU instructions take a register and an immediate, generally using `opi rd, rs1, imm`. Both write their result to rd, advance PC by 4, and do not access data memory.
+
+| R-type instruction | I-type ALU instruction | Operation | Common use |
+| --- | --- | --- | --- |
+| `add rd, rs1, rs2` | `addi rd, rs1, imm` | Addition, keeping the low 32 bits | Accumulation, counters, address calculations |
+| `sub rd, rs1, rs2` | No SUBI; ADDI can use an encodable negative immediate | `rs1 - rs2`, keeping the low 32 bits | Differences, decrementing |
+| `and rd, rs1, rs2` | `andi rd, rs1, imm` | Bitwise AND | Masks, extracting bits |
+| `or rd, rs1, rs2` | `ori rd, rs1, imm` | Bitwise OR | Setting bits |
+| `xor rd, rs1, rs2` | `xori rd, rs1, imm` | Bitwise XOR | Toggling or comparing bits |
+| `slt rd, rs1, rs2` | `slti rd, rs1, imm` | Write 1 if signed less-than, otherwise 0 | Signed comparisons |
+| `sltu rd, rs1, rs2` | `sltiu rd, rs1, imm` | Write 1 if unsigned less-than, otherwise 0 | Unsigned comparisons |
+| `sll rd, rs1, rs2` | `slli rd, rs1, shamt` | Shift left, filling low bits with zero | Bit positioning, multiplication by powers of 2 truncated to 32 bits |
+| `srl rd, rs1, rs2` | `srli rd, rs1, shamt` | Logical right shift, filling high bits with zero | Unsigned shifts, field extraction |
+| `sra rd, rs1, rs2` | `srai rd, rs1, shamt` | Arithmetic right shift, replicating the sign bit | Right shifts that preserve a negative sign |
+
+Ordinary I-type ALU immediates are signed 12-bit values from -2048 to 2047, sign-extended to 32 bits. ANDI, ORI, and XORI follow this rule too. SLTIU also sign-extends its immediate before comparing as unsigned; it does not zero-extend the immediate. Immediate shifts instead use a 5-bit shamt from 0 to 31. R-type shifts use the low 5 bits of rs2.
+
+For example, comparing `0xFFFFFFFF` against 1 with SLT interprets it as -1 < 1 and returns 1. SLTU interprets it as 4294967295 < 1 and returns 0. Shifting `0x80000000` right by one with SRL produces `0x40000000`; SRA produces `0xC0000000`. Comparison instructions only produce 0 or 1; they do not redirect PC.
+
+### How the ALU and rd Write-back Work Together
+
+The parser extracts `rd = instr[11:7]`, rs1, and rs2. The Register File supplies `rdata1` and `rdata2`. The ALUSrc MUX selects the second operand: R-type uses `alu_src = 0` for rdata2, while I-type uses `alu_src = 1` for imm from ImmGen. The Control Unit selects the ALU operation using alu_op.
+
+```text
+Register File[rs1] ─────────────── ALU a
+Register File[rs2] ── ALUSrc MUX ── ALU b
+ImmGen imm ────────── ALUSrc MUX
+ALU result ── wb_data ── Register File[rd]
+```
+
+This chapter directly connects `wb_data = alu_result`. The Register File receives rd on waddr, reg_write on we, and wb_data on wdata. At the next rising edge, if we is one and rd is not x0, it writes the result to the destination register; PC simultaneously advances by 4. The ALU is combinational logic; the Register File actually stores the result.
+
+For example, `addi x1,x0,5` adds 0 and immediate 5 and writes 5 to x1. With x1=5 and x2=10, `add x3,x1,x2` writes 15 to x3. The x0 rule discards the write from `addi x0,x0,0`, while PC advances normally by 4, making it a NOP.
+
 ## New Logic and Data Flow
 
 | New component | Location | Purpose |

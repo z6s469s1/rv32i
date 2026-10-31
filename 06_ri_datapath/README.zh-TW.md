@@ -10,6 +10,41 @@ PC adder 產生下一個循序位址，parser 將指令拆成欄位，Control Un
 
 ![R/I Datapath](ri_datapath.png)
 
+## R-type 與 I-type ALU 指令介紹
+
+R-type 以兩個暫存器作為運算元，語法通常為 `op rd, rs1, rs2`；I-type ALU 以一個暫存器搭配立即數，語法通常為 `opi rd, rs1, imm`。兩者都將結果寫回 rd，執行後 PC 加 4，不存取資料記憶體。
+
+| R-type 指令 | I-type ALU 指令 | 操作 | 常見用途 |
+| --- | --- | --- | --- |
+| `add rd, rs1, rs2` | `addi rd, rs1, imm` | 加法，保留低 32 bits | 累加、計數器、位址計算 |
+| `sub rd, rs1, rs2` | 無 SUBI；可用 ADDI 搭配可編碼的負立即數 | `rs1 - rs2`，保留低 32 bits | 差值、遞減 |
+| `and rd, rs1, rs2` | `andi rd, rs1, imm` | 逐位元 AND | 遮罩、擷取位元 |
+| `or rd, rs1, rs2` | `ori rd, rs1, imm` | 逐位元 OR | 設定位元 |
+| `xor rd, rs1, rs2` | `xori rd, rs1, imm` | 逐位元 XOR | 翻轉或比較位元 |
+| `slt rd, rs1, rs2` | `slti rd, rs1, imm` | signed 小於時寫 1，否則寫 0 | 有號數比較 |
+| `sltu rd, rs1, rs2` | `sltiu rd, rs1, imm` | unsigned 小於時寫 1，否則寫 0 | 無號數比較 |
+| `sll rd, rs1, rs2` | `slli rd, rs1, shamt` | 左移，低位補 0 | 位元排列、乘以 2 的次方並截斷至 32 bits |
+| `srl rd, rs1, rs2` | `srli rd, rs1, shamt` | 邏輯右移，高位補 0 | 無號數位移、擷取欄位 |
+| `sra rd, rs1, rs2` | `srai rd, rs1, shamt` | 算術右移，高位補符號位元 | 保留負數符號的右移 |
+
+一般 I-type ALU 立即數是 signed 12-bit，範圍為 -2048～2047，先符號延伸至 32 bits；ANDI、ORI、XORI 也遵守這個規則。SLTIU 同樣先符號延伸立即數，再以 unsigned 比較，不是將立即數補 0。位移立即數指令則使用 5-bit shamt，範圍為 0～31；R-type 位移取 rs2 的低 5 bits。
+
+例如 `0xFFFFFFFF` 與 1 比較，SLT 視為 -1 < 1，結果是 1；SLTU 視為 4294967295 < 1，結果是 0。對 `0x80000000` 右移一位，SRL 得到 `0x40000000`，SRA 則得到 `0xC0000000`。比較指令只產生 0 或 1，不會改變 PC 的循序路徑。
+
+### ALU 與 rd 寫回如何配合
+
+Parser 取出 `rd = instr[11:7]`、rs1 與 rs2。Register File 提供 `rdata1`、`rdata2`，ALUSrc MUX 再依指令選擇第二運算元：R-type 的 `alu_src = 0` 選 rdata2，I-type 的 `alu_src = 1` 選 ImmGen 輸出的 imm。Control Unit 用 alu_op 指定 ALU 執行的操作。
+
+```text
+Register File[rs1] ─────────────── ALU a
+Register File[rs2] ── ALUSrc MUX ── ALU b
+ImmGen imm ────────── ALUSrc MUX
+ALU result ── wb_data ── Register File[rd]
+```
+
+此章直接令 `wb_data = alu_result`。`rd` 接到 Register File 的 waddr，reg_write 接到 we，wb_data 接到 wdata。下一個上升緣，若 we 為 1 且 rd 不為 x0，就將結果寫入目的暫存器；PC 同時更新為 PC + 4。ALU 是組合邏輯，實際保存結果的是 Register File。
+
+例如 `addi x1,x0,5` 使用 0 與立即數 5 相加，將 5 寫入 x1；`add x3,x1,x2` 在 x1=5、x2=10 時將 15 寫入 x3。`addi x0,x0,0` 的寫入被 x0 規則忽略，且 PC 正常加 4，因此可作為 NOP。
 
 ## 新增邏輯與資料流
 
