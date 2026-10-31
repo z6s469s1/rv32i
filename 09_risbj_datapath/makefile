@@ -2,7 +2,7 @@ IVERILOG ?= iverilog
 VVP ?= vvp
 GTKWAVE ?= gtkwave
 
-TARGET := tb_core_risbj
+TARGET := tb_core_risbj.vvp
 SRC_LIST := core_risbj.v tb_core_risbj.v alu.v control.v immgen.v reg_file.v imem.v pc.v dmem.v branch_unit.v
 
 .PHONY: sim wave clean

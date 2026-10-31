@@ -2,7 +2,7 @@ IVERILOG ?= iverilog
 VVP ?= vvp
 GTKWAVE ?= gtkwave
 
-TARGET := pc_tb
+TARGET := pc_tb.vvp
 SRC_LIST := pc.v tb_pc.v
 
 .PHONY: sim wave clean

@@ -1,5 +1,5 @@
-# Compiled Verilog testbench executables
-*_tb
+# Compiled Icarus Verilog simulation files
+*.vvp
 
 # Generated simulation waveforms
 *.vcd
